@@ -118,7 +118,7 @@ void usage_list(size_t depth)
     indent_and_println(depth, "list: list all tasks");
     indent_and_println(depth, "options:");
     indent_and_println(depth, "    --priority/-p <min-priority>: show only tasks with priority higher than minimum priority");
-    indent_and_println(depth, "    --help/-h: print usage of list subcommand\n");
+    indent_and_println(depth, "    --help/-h: print usage of list subcommand");
 }
 
 void usage_done(size_t depth)
