@@ -7,6 +7,90 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define IS_LITTLE_ENDIAN 1
+#else
+#define IS_LITTLE_ENDIAN 0
+#endif
+
+// helper functions to ensure endianness isn't broken
+
+#if IS_LITTLE_ENDIAN
+
+size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+
+size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+
+#else
+
+size_t le_fwrite_1(uint8_t val, FILE *stream)
+{
+    return fwrite(&val, 1, sizeof(val), stream);
+}
+
+size_t le_fwrite_2(uint16_t val, FILE *stream)
+{
+    uint8_t bytes[sizeof(val)] = {val & 0xFF, val >> 8};
+    return fwrite(bytes, 1, sizeof(bytes), stream);
+}
+
+size_t le_fwrite_4(uint32_t val, FILE *stream)
+{
+    uint8_t bytes[sizeof(val)] = {val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, (val >> 24) & 0xFF};
+    return fwrite(bytes, 1, sizeof(bytes), stream);
+}
+
+size_t le_fwrite_8(uint64_t val, FILE *stream)
+{
+
+    uint8_t bytes[sizeof(val)] = {val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, (val >> 24) & 0xFF, (val >> 32) & 0xFF, (val >> 40) & 0xFF, (val >> 48) & 0xFF, (val >> 56) & 0xFF};
+    return fwrite(bytes, 1, sizeof(bytes), stream);
+}
+
+size_t le_fread_1(uint8_t *val, FILE *stream)
+{
+    return fread(val, 1, 1, stream);
+}
+
+size_t le_fread_2(uint16_t *val, FILE *stream)
+{
+    uint8_t bytes[2];
+    if (fread(bytes, 1, 2, stream) != 2)
+        return 0;
+    *val = (uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8);
+    return 2;
+}
+
+size_t le_fread_4(uint32_t *val, FILE *stream)
+{
+    uint8_t bytes[4];
+    if (fread(bytes, 1, 4, stream) != 4)
+        return 0;
+    *val = (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
+           ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+    return 4;
+}
+
+size_t le_fread_8(uint64_t *val, FILE *stream)
+{
+    uint8_t bytes[8];
+    if (fread(bytes, 1, 8, stream) != 8)
+        return 0;
+    *val = (uint64_t)bytes[0] | ((uint64_t)bytes[1] << 8) |
+           ((uint64_t)bytes[2] << 16) | ((uint64_t)bytes[3] << 24) |
+           ((uint64_t)bytes[4] << 32) | ((uint64_t)bytes[5] << 40) |
+           ((uint64_t)bytes[6] << 48) | ((uint64_t)bytes[7] << 56);
+    return 8;
+}
+
+#endif
+
 // clean up of a lot of random things
 
 #define FATAL(failure)                                                 \
@@ -58,6 +142,78 @@ Stands for error malloc(allocate memory and fatally error if can't alloc)
             }                                           \
             FATAL("fopen");                             \
         }                                               \
+    } while (0)
+
+#define E_FWRITE_1(val, file)                      \
+    do                                             \
+    {                                              \
+        if (le_fwrite_1(val, file) != sizeof(val)) \
+        {                                          \
+            FATAL("fwrite");                       \
+        }                                          \
+    } while (0)
+
+#define E_FWRITE_2(val, file)                      \
+    do                                             \
+    {                                              \
+        if (le_fwrite_2(val, file) != sizeof(val)) \
+        {                                          \
+            FATAL("fwrite");                       \
+        }                                          \
+    } while (0)
+
+#define E_FWRITE_4(val, file)                      \
+    do                                             \
+    {                                              \
+        if (le_fwrite_4(val, file) != sizeof(val)) \
+        {                                          \
+            FATAL("fwrite");                       \
+        }                                          \
+    } while (0)
+
+#define E_FWRITE_8(val, file)                      \
+    do                                             \
+    {                                              \
+        if (le_fwrite_8(val, file) != sizeof(val)) \
+        {                                          \
+            FATAL("fwrite");                       \
+        }                                          \
+    } while (0)
+
+#define E_FREAD_1(var, file)                       \
+    do                                             \
+    {                                              \
+        if (le_fread_1(&var, file) != sizeof(var)) \
+        {                                          \
+            FATAL("fread");                        \
+        }                                          \
+    } while (0)
+
+#define E_FREAD_2(var, file)                       \
+    do                                             \
+    {                                              \
+        if (le_fread_2(&var, file) != sizeof(var)) \
+        {                                          \
+            FATAL("fread");                        \
+        }                                          \
+    } while (0)
+
+#define E_FREAD_4(var, file)                       \
+    do                                             \
+    {                                              \
+        if (le_fread_4(&var, file) != sizeof(var)) \
+        {                                          \
+            FATAL("fread");                        \
+        }                                          \
+    } while (0)
+
+#define E_FREAD_8(var, file)                       \
+    do                                             \
+    {                                              \
+        if (le_fread_8(&var, file) != sizeof(var)) \
+        {                                          \
+            FATAL("fread");                        \
+        }                                          \
     } while (0)
 
 #define TODO_FILE ".todo"
@@ -170,8 +326,8 @@ void usage_subcommand(uint8_t subcommand, const char *our_name)
 
 void add(const char *file, const char *msg, uint8_t priority)
 {
-    size_t file_len = strlen(file);
-    size_t msg_len = strlen(msg);
+    uint32_t file_len = (uint32_t)strlen(file);
+    uint32_t msg_len = (uint32_t)strlen(msg);
 
     uint32_t tid = 0;
     bool found = false;
@@ -179,7 +335,7 @@ void add(const char *file, const char *msg, uint8_t priority)
     FILE *tid_count;
     E_FOPEN(tid_count, TODO_TID_COUNT, "r+b");
 
-    size_t tid_flen;
+    uint32_t tid_flen;
     char *tid_f;
 
     long tid_start;
@@ -188,12 +344,13 @@ void add(const char *file, const char *msg, uint8_t priority)
 
     while (1)
     {
-        if (fread(&tid_flen, sizeof(tid_flen), 1, tid_count) != 1)
+        if (le_fread_4(&tid_flen, tid_count) != sizeof(tid_flen))
             break; // nothing there
+
         if (tid_flen != file_len)
         {
             E_FSEEK(tid_count, tid_flen, SEEK_CUR);
-            fread(&skip_tid, sizeof(skip_tid), 1, tid_count); // since we wanna skip over this tid
+            E_FREAD_4(skip_tid, tid_count); // since we wanna skip over this tid
             continue;
         }
 
@@ -203,7 +360,7 @@ void add(const char *file, const char *msg, uint8_t priority)
         if (memcmp(tid_f, file, file_len)) // if they AREN'T equal
         {
             free(tid_f);
-            fread(&tid_flen, sizeof(tid_flen), 1, tid_count);
+            E_FREAD_4(tid_flen, tid_count);
             continue;
         }
         tid_start = ftell(tid_count);
@@ -211,12 +368,12 @@ void add(const char *file, const char *msg, uint8_t priority)
         {
             FATAL("ftell");
         }
-        fread(&tid, sizeof(tid), 1, tid_count);
+        E_FREAD_4(tid, tid_count);
         tid++; // get NEXT tid
 
         E_FSEEK(tid_count, tid_start, SEEK_SET);
 
-        fwrite(&tid, sizeof(tid), 1, tid_count);
+        E_FWRITE_4(tid, tid_count);
         found = true;
         free(tid_f);
         break;
@@ -225,9 +382,9 @@ void add(const char *file, const char *msg, uint8_t priority)
     if (!found)
     {
         E_FSEEK(tid_count, 0, SEEK_END);
-        fwrite(&file_len, sizeof(file_len), 1, tid_count);
+        E_FWRITE_4(file_len, tid_count);
         fwrite(file, file_len, 1, tid_count);
-        fwrite(&tid, sizeof(tid), 1, tid_count);
+        E_FWRITE_4(tid, tid_count);
     }
 
     fclose(tid_count);
@@ -235,11 +392,11 @@ void add(const char *file, const char *msg, uint8_t priority)
     FILE *todo_file;
     E_FOPEN(todo_file, TODO_FILE, "ab");
 
-    fwrite(&file_len, sizeof(file_len), 1, todo_file);
+    E_FWRITE_4(file_len, todo_file);
     fwrite(file, file_len, 1, todo_file);
-    fwrite(&priority, sizeof(priority), 1, todo_file);
-    fwrite(&tid, sizeof(tid), 1, todo_file);
-    fwrite(&msg_len, sizeof(msg_len), 1, todo_file);
+    E_FWRITE_1(priority, todo_file);
+    E_FWRITE_4(tid, todo_file);
+    E_FWRITE_4(msg_len, todo_file);
     fwrite(msg, msg_len, 1, todo_file);
 
     fclose(todo_file);
@@ -251,31 +408,31 @@ void list(const char *file, uint8_t priority)
         printf("todo list of file %s:\n", file);
     else
         printf("full todo list:\n");
-    size_t file_len = strlen(file);
+    uint32_t file_len = (uint32_t)strlen(file);
 
     FILE *todo_file;
 
     E_FOPEN_TASKS(todo_file, TODO_FILE, "rb");
 
     char *gotten_file;
-    size_t gotten_file_len;
+    uint32_t gotten_file_len;
     uint8_t gotten_priority;
     uint32_t tid;
-    size_t msg_len;
+    uint32_t msg_len;
     char *msg;
 
     while (true)
     {
-        if (fread(&gotten_file_len, sizeof(gotten_file_len), 1, todo_file) != 1) // nothing left
+        if (le_fread_4(&gotten_file_len, todo_file) != sizeof(gotten_file_len)) // nothing left
             break;
 
         if (gotten_file_len != file_len)
         {
             // not our file!
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&tid, sizeof(tid), 1, todo_file);
-            fread(&gotten_file_len, sizeof(gotten_file_len), 1, todo_file); // since we re-read next iteration
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(tid, todo_file);
+            E_FREAD_4(gotten_file_len, todo_file); // since we re-read next iteration, we don't care about the value of gotten_file_len
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
             continue;
         }
@@ -287,26 +444,26 @@ void list(const char *file, uint8_t priority)
         if (memcmp(gotten_file, file, file_len)) // if NOT equal
         {
             free(gotten_file);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&tid, sizeof(tid), 1, todo_file);
-            fread(&msg_len, sizeof(msg_len), 1, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(tid, todo_file);
+            E_FREAD_4(msg_len, todo_file);
             E_FSEEK(todo_file, msg_len, SEEK_CUR);
             continue;
         }
 
         // they are equal
-        fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
+        E_FREAD_1(gotten_priority, todo_file);
         if (gotten_priority < priority && !(priority <= PRIORITY_DEFAULT && gotten_priority == PRIORITY_DONE))
         {
             free(gotten_file);
-            fread(&tid, sizeof(tid), 1, todo_file);
-            fread(&msg_len, sizeof(msg_len), 1, todo_file);
+            E_FREAD_4(tid, todo_file);
+            E_FREAD_4(msg_len, todo_file);
             E_FSEEK(todo_file, msg_len, SEEK_CUR);
             continue; // skip it
         }
 
-        fread(&tid, sizeof(tid), 1, todo_file);
-        fread(&msg_len, sizeof(msg_len), 1, todo_file);
+        E_FREAD_4(tid, todo_file);
+        E_FREAD_4(msg_len, todo_file);
 
         E_MALLOC(msg, msg_len + 1);
 
@@ -331,33 +488,33 @@ void list(const char *file, uint8_t priority)
 
 uint32_t parse_tid(const char *arg); // done and rm use it
 
-void done(const char *file, const char *arg)
+void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8_t *invalid_priorities, char **errormessages, uint8_t invalid_count)
 {
-    uint32_t tid = parse_tid(arg);
-    size_t file_len = strlen(file);
+    uint32_t file_len = strlen(file);
 
     FILE *todo_file;
 
     E_FOPEN_TASKS(todo_file, TODO_FILE, "r+b");
 
-    size_t gotten_file_len;
+    uint32_t gotten_file_len;
     char *gotten_file;
     uint8_t gotten_priority;
     uint32_t gotten_tid;
-    size_t gotten_msg_len;
+    uint32_t gotten_msg_len;
 
     bool made_done = false;
 
     while (true)
     {
-        if (fread(&gotten_file_len, sizeof(gotten_file_len), 1, todo_file) != 1)
+        if (le_fread_4(&gotten_file_len, todo_file) != sizeof(gotten_file_len))
             break; // nothing left
+
         if (gotten_file_len != file_len)
         {
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
         }
@@ -369,42 +526,39 @@ void done(const char *file, const char *arg)
         if (memcmp(gotten_file, file, file_len)) // if NOT equal
         {
             free(gotten_file);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
         }
 
         // equal files, check tid
-        fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file); // just skip over it
-        fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
+        E_FREAD_1(gotten_priority, todo_file); // just skip over it
+        E_FREAD_4(gotten_tid, todo_file);
 
         if (gotten_tid != tid)
         {
             free(gotten_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
         }
 
-        if (gotten_priority == PRIORITY_DONE)
+        for (uint8_t i = 0; i < invalid_count; i++)
         {
-            fprintf(stderr, "Task is already marked done\n");
-            exit(EXIT_FAILURE);
+            if (gotten_priority == invalid_priorities[i])
+            {
+                fprintf(stderr, "%s\n", errormessages[i]);
+                exit(EXIT_FAILURE);
+            }
         }
 
-        if (gotten_priority == PRIORITY_REMOVED)
-        {
-            fprintf(stderr, "Task has already been removed\n");
-            exit(EXIT_FAILURE);
-        }
-
-        gotten_priority = PRIORITY_DONE; // set it to done(we later use this)
+        gotten_priority = new_priority; // set it to new priority(we later use this)
 
         // tid equal
         E_FSEEK(todo_file, -sizeof(gotten_tid) - sizeof(gotten_priority), SEEK_CUR); // go backwards(safe as we JUST went forwards the same amount before)
-        fwrite(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
+        E_FWRITE_1(gotten_priority, todo_file);
         free(gotten_file);
         made_done = true;
         break;
@@ -422,89 +576,16 @@ void done(const char *file, const char *arg)
     fclose(todo_file);
 }
 
+void done(const char *file, const char *arg)
+{
+    uint32_t tid = parse_tid(arg);
+    change_priority(file, tid, PRIORITY_DONE, (uint8_t[]){PRIORITY_DONE, PRIORITY_REMOVED}, (char *[]){"Task is already marked done", "Task has already been removed"}, 2);
+}
+
 void rm(const char *file, const char *arg)
 {
     uint32_t tid = parse_tid(arg);
-    size_t file_len = strlen(file);
-
-    FILE *todo_file;
-
-    E_FOPEN_TASKS(todo_file, TODO_FILE, "r+b");
-
-    size_t gotten_file_len;
-    char *gotten_file;
-    uint8_t gotten_priority;
-    uint32_t gotten_tid;
-    size_t gotten_msg_len;
-
-    bool removed = false;
-
-    while (true)
-    {
-        if (fread(&gotten_file_len, sizeof(gotten_file_len), 1, todo_file) != 1)
-            break; // nothing left
-        if (gotten_file_len != file_len)
-        {
-            E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
-            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
-            continue;
-        }
-
-        E_MALLOC(gotten_file, gotten_file_len);
-
-        fread(gotten_file, gotten_file_len, 1, todo_file);
-
-        if (memcmp(gotten_file, file, file_len)) // if NOT equal
-        {
-            free(gotten_file);
-            fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-            fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
-            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
-            continue;
-        }
-
-        // equal files, check tid
-        fread(&gotten_priority, sizeof(gotten_priority), 1, todo_file); // just skip over it
-        fread(&gotten_tid, sizeof(gotten_tid), 1, todo_file);
-
-        if (gotten_tid != tid)
-        {
-            free(gotten_file);
-            fread(&gotten_msg_len, sizeof(gotten_msg_len), 1, todo_file);
-            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
-            continue;
-        }
-
-        if (gotten_priority == PRIORITY_REMOVED)
-        {
-            fprintf(stderr, "Task has already been removed\n");
-            exit(EXIT_FAILURE);
-        }
-
-        gotten_priority = PRIORITY_REMOVED; // set it to removed(we later use this)
-
-        // tid equal
-        E_FSEEK(todo_file, -sizeof(gotten_tid) - sizeof(gotten_priority), SEEK_CUR); // go backwards(safe as we JUST went forwards the same amount before)
-        fwrite(&gotten_priority, sizeof(gotten_priority), 1, todo_file);
-        free(gotten_file);
-        removed = true;
-        break;
-    }
-
-    if (!removed)
-    {
-        if (*file)
-            fprintf(stderr, "No such task id %u in file `%s`\n", tid, file);
-        else
-            fprintf(stderr, "No such task id %u\n", tid);
-        exit(EXIT_FAILURE);
-    }
-
-    fclose(todo_file);
+    change_priority(file, tid, PRIORITY_REMOVED, (uint8_t[]){PRIORITY_REMOVED}, (char *[]){"Task has already been removed"}, 1);
 }
 
 uint32_t parse_tid(const char *arg) // needed by `done` and `rm`
