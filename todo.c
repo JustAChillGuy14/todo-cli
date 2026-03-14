@@ -17,15 +17,15 @@
 
 #if IS_LITTLE_ENDIAN
 
-inline size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
 
-inline size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
 
 #else
 
