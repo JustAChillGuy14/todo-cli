@@ -17,15 +17,15 @@
 
 #if IS_LITTLE_ENDIAN
 
-inline size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-inline size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+static inline size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
 
-inline size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-inline size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+static inline size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
 
 #else
 
@@ -231,6 +231,8 @@ Stands for error malloc(allocate memory and fatally error if can't alloc)
 #define PRIORITY_LOW 0x55
 #define PRIORITY_MID 0xaa
 #define PRIORITY_HIGH 0xff
+
+#define SUBLIST_DEFAULT 0x0
 
 static void indent(size_t count)
 {
@@ -654,12 +656,34 @@ static uint8_t parse_priority(const char *str)
     return value;
 }
 
+static uint32_t parse_sublist(const char *arg)
+{
+    uint32_t value = 0;
+    for (const char *s = arg; *s; s++)
+    {
+        if (*s < '0' || *s > '9')
+        {
+            fprintf(stderr, "Unrecognized sublist id: %s\n", arg);
+            exit(EXIT_FAILURE);
+        }
+        uint8_t digit = *s - '0';
+        if (value > (UINT32_MAX - digit) / 10)
+        {
+            fprintf(stderr, "Sublist id too high: %s\n", arg);
+            exit(EXIT_FAILURE);
+        }
+        value = value * 10 + digit;
+    }
+    return value;
+}
+
 typedef struct
 {
     uint8_t subcommand;
     char *file;
     char *arg;
     uint8_t priority;
+    uint32_t sublist; // essentially the parent
 } cli_state;
 
 #define REQUIRE_ARG(subcmd, i, argc)                           \
@@ -693,6 +717,13 @@ typedef struct
         state->priority = parse_priority(argv[++i]); \
     } while (0)
 
+#define HANDLE_ARG_SUBL(s, state, i, argc, argv)   \
+    do                                             \
+    {                                              \
+        REQUIRE_ARG(s, i, argc);                   \
+        state->sublist = parse_sublist(argv[++i]); \
+    } while (0)
+
 #define UNRECOGNIZED_OPTION(arg)                            \
     do                                                      \
     {                                                       \
@@ -706,6 +737,7 @@ static void parse_args(int argc, char **argv, cli_state *state)
     state->file = "";
     state->arg = NULL;
     state->priority = PRIORITY_DEFAULT; // lowest priority, lower than PRIORITY_LOW
+    state->sublist = SUBLIST_DEFAULT;   // 0
 
     bool flagend = false;
 
@@ -731,6 +763,8 @@ static void parse_args(int argc, char **argv, cli_state *state)
                     HANDLE_ARG_FILE("--file", state, i, argc, argv);
                 else if (!strcmp(arg, "--priority"))
                     HANDLE_ARG_PRIO("--priority", state, i, argc, argv);
+                else if (!strcmp(arg, "--sublist"))
+                    HANDLE_ARG_SUBL("--sublist", state, i, argc, argv);
                 else
                     UNRECOGNIZED_OPTION(arg);
 
@@ -748,6 +782,8 @@ static void parse_args(int argc, char **argv, cli_state *state)
             case 'p':
                 HANDLE_ARG_PRIO("-p", state, i, argc, argv);
                 break;
+            case 's':
+                HANDLE_ARG_SUBL("-s", state, i, argc, argv);
             default:
                 UNRECOGNIZED_OPTION(arg);
             }
