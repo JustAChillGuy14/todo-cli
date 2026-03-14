@@ -1,0 +1,26 @@
+# This is a format of how tasks and IDs are layed out across .todo and .todo.tid
+
+# NOTE: tid stands for task id
+
+.todo:
+    endianness: little endian
+
+    [file_len][file][priority][tid][message_len][message]...
+
+    types:
+        file_len: u32
+        file: char[file_len]
+        priority: u8
+        tid: u32
+        message_len: u32
+        message: char[message_len]
+
+.todo.tid:
+    endianness: little endian
+
+    [file_len][file][current_tid]
+
+    types:
+        file_len: u32
+        file: char[file_len]
+        current_tid: u32

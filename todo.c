@@ -17,15 +17,15 @@
 
 #if IS_LITTLE_ENDIAN
 
-size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
-size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+inline size_t le_fwrite_1(uint8_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+inline size_t le_fwrite_2(uint16_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+inline size_t le_fwrite_4(uint32_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
+inline size_t le_fwrite_8(uint64_t val, FILE *stream) { return fwrite(&val, 1, sizeof(val), stream); }
 
-size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
-size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+inline size_t le_fread_1(uint8_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+inline size_t le_fread_2(uint16_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+inline size_t le_fread_4(uint32_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
+inline size_t le_fread_8(uint64_t *val, FILE *stream) { return fread(val, 1, sizeof(*val), stream); }
 
 #else
 
@@ -91,7 +91,7 @@ size_t le_fread_8(uint64_t *val, FILE *stream)
 
 #endif
 
-// clean up of a lot of random things
+// these macros clean up of a lot of random things
 
 #define FATAL(failure)                                                 \
     do                                                                 \
@@ -263,7 +263,6 @@ void usage_add(size_t depth)
 
 void usage_rm(size_t depth)
 {
-
     indent_and_println(depth, "rm <task-id>: remove a specific task");
     indent_and_println(depth, "options:");
     indent_and_println(depth, "    --help/-h: print usage of rm subcommand");
@@ -281,7 +280,7 @@ void usage_done(size_t depth)
 {
     indent_and_println(depth, "done <task-id>: mark specific task done");
     indent_and_println(depth, "options:");
-    indent_and_println(depth, "    --help/-h: print usage of done subcommand\n");
+    indent_and_println(depth, "    --help/-h: print usage of done subcommand");
 }
 
 void usage(const char *our_name)
