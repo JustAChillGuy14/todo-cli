@@ -924,7 +924,7 @@ void rm(const char *file, const char *arg, uint32_t sublist)
 
         if (gotten_parent != sublist)
         {
-            fprintf(stderr, "Incorrect sublist specified to mark this task done.\n");
+            fprintf(stderr, "Incorrect sublist specified to remove this task.\n");
             fprintf(stderr, "The correct sublist is: %" PRIu32 "\n", gotten_parent);
             exit(EXIT_FAILURE);
         }
@@ -934,7 +934,7 @@ void rm(const char *file, const char *arg, uint32_t sublist)
 
         if (gotten_child_count > 0)
         {
-            fprintf(stderr, "Cannot mark this sublist done as it still has children\n");
+            fprintf(stderr, "Cannot remove this sublist as it still has children\n");
             exit(EXIT_FAILURE);
         }
 
