@@ -291,6 +291,7 @@ void usage(const char *our_name)
     printf("options:\n");
     printf("    --help/-h: print usage\n");
     printf("    --file/-f <file>: do subcommand only on one file\n");
+    printf("    --sublist/-s <sublist id>: do subcommand on specified sublist id\n");
     printf("subcommands:\n");
     usage_add(1);
     printf("\n");
@@ -325,7 +326,7 @@ void usage_subcommand(uint8_t subcommand, const char *our_name)
     }
 }
 
-void add(const char *file, const char *msg, uint8_t priority)
+void add(const char *file, const char *msg, uint8_t priority, uint32_t sublist)
 {
     uint32_t file_len = (uint32_t)strlen(file);
     uint32_t msg_len = (uint32_t)strlen(msg);
@@ -382,28 +383,165 @@ void add(const char *file, const char *msg, uint8_t priority)
 
     if (!found)
     {
+        // not found, so tid = 0
+
         E_FSEEK(tid_count, 0, SEEK_END);
         E_FWRITE_4(file_len, tid_count);
         fwrite(file, file_len, 1, tid_count);
+        tid++; // because we will actually operate on `1` NOT `0` this time.
         E_FWRITE_4(tid, tid_count);
+
+        FILE *todo_file;
+        E_FOPEN(todo_file, TODO_FILE, "ab");
+
+        E_FWRITE_4(file_len, todo_file);
+        fwrite(file, file_len, 1, todo_file);
+        tid--; // restoration
+        E_FWRITE_4(tid, todo_file);
+
+        uint32_t zero = 0;
+        uint8_t root_prio = PRIORITY_DEFAULT;
+
+        // priority, parent, child-count, child-done-count, message-len
+
+        E_FWRITE_1(root_prio, todo_file);
+        E_FWRITE_4(zero, todo_file); // yes, 0's parent is 0, because we don't have to validate anything :)
+        E_FWRITE_4(zero, todo_file); // 0 children (currently)
+        E_FWRITE_4(zero, todo_file); // 0 children who are marked done (currently)
+        E_FWRITE_4(zero, todo_file); // 0 is the length of the root's message
+
+        tid++; // get tid to be 1 instead of 0
+
+        fclose(todo_file);
     }
 
     fclose(tid_count);
 
+    if (sublist >= tid)
+    {
+        fprintf(stderr, "sublist id %" PRIu32 " doesn't exist.\n", sublist);
+        exit(EXIT_FAILURE);
+    }
+
+    uint32_t flen;
+    char *f;
+    uint32_t id;
+    uint8_t prio;
+    uint32_t parent_id;
+    uint32_t child_count;
+
+    // NOTE: we don't need this:
+    // uint32_t child_done_count;
+    // uint32_t mlen;
+    // char *m;
+
+    // ensure TODO_FILE exists
+
     FILE *todo_file;
-    E_FOPEN(todo_file, TODO_FILE, "ab");
+
+    // we know it exists because we make it at tid = 0
+
+    E_FOPEN(todo_file, TODO_FILE, "r+b");
+
+    while (true)
+    {
+        E_FREAD_4(flen, todo_file);
+
+        if (flen != file_len)
+        {
+            E_FSEEK(todo_file, flen, SEEK_CUR);
+            E_FREAD_4(id, todo_file);
+            E_FREAD_1(prio, todo_file);
+            E_FREAD_4(parent_id, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FSEEK(todo_file, sizeof(uint32_t), SEEK_CUR); // skip child_done_count
+            E_FREAD_4(flen, todo_file);                     // get len(into flen because we don't have mlen)
+            E_FSEEK(todo_file, flen, SEEK_CUR);
+            continue;
+        }
+
+        E_MALLOC(f, flen);
+
+        fread(f, flen, 1, todo_file);
+
+        if (memcmp(f, file, flen))
+        {
+            // NOT equal
+            free(f);
+            E_FREAD_4(id, todo_file);
+            E_FREAD_1(prio, todo_file);
+            E_FREAD_4(parent_id, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FSEEK(todo_file, sizeof(uint32_t), SEEK_CUR); // skip child_done_count
+            E_FREAD_4(flen, todo_file);                     // get len(into flen because we don't have mlen)
+            E_FSEEK(todo_file, flen, SEEK_CUR);
+            continue;
+        }
+
+        E_FREAD_4(id, todo_file);
+
+        if (id != sublist)
+        {
+            free(f);
+            E_FREAD_1(prio, todo_file);
+            E_FREAD_4(parent_id, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FSEEK(todo_file, sizeof(uint32_t), SEEK_CUR); // skip child_done_count
+            E_FREAD_4(flen, todo_file);                     // get len(into flen because we don't have mlen)
+            E_FSEEK(todo_file, flen, SEEK_CUR);
+            continue;
+        }
+
+        // our match
+
+        E_FREAD_1(prio, todo_file);
+
+        if (prio == PRIORITY_REMOVED)
+        {
+            fprintf(stderr, "Sublist has already been removed.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (prio == PRIORITY_DONE)
+        {
+            fprintf(stderr, "Sublist has already been marked done.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        E_FREAD_4(parent_id, todo_file); // nothing to do with it though
+
+        E_FREAD_4(child_count, todo_file);
+
+        E_FSEEK(todo_file, -4, SEEK_CUR); // writing mode INITIATED!!(go backwards to write the NEW child_count)
+
+        child_count++;
+
+        E_FWRITE_4(child_count, todo_file);
+
+        free(f);
+
+        break;
+    }
+
+    E_FSEEK(todo_file, 0, SEEK_END);
+
+    child_count = 0;               // default at the start (we already have it from the sublist search)
+    uint32_t child_done_count = 0; // default at the start
 
     E_FWRITE_4(file_len, todo_file);
     fwrite(file, file_len, 1, todo_file);
-    E_FWRITE_1(priority, todo_file);
     E_FWRITE_4(tid, todo_file);
+    E_FWRITE_1(priority, todo_file);
+    E_FWRITE_4(sublist, todo_file);
+    E_FWRITE_4(child_count, todo_file);
+    E_FWRITE_4(child_done_count, todo_file);
     E_FWRITE_4(msg_len, todo_file);
     fwrite(msg, msg_len, 1, todo_file);
 
     fclose(todo_file);
 }
 
-void list(const char *file, uint8_t priority)
+void list(const char *file, uint8_t priority, uint32_t sublist)
 {
     if (*file)
         printf("todo list of file %s:\n", file);
@@ -417,8 +555,11 @@ void list(const char *file, uint8_t priority)
 
     char *gotten_file;
     uint32_t gotten_file_len;
-    uint8_t gotten_priority;
     uint32_t tid;
+    uint8_t gotten_priority;
+    uint32_t parent;
+    uint32_t child_count;
+    uint32_t child_done_count;
     uint32_t msg_len;
     char *msg;
 
@@ -431,8 +572,11 @@ void list(const char *file, uint8_t priority)
         {
             // not our file!
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
-            E_FREAD_1(gotten_priority, todo_file);
             E_FREAD_4(tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(parent, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FREAD_4(child_done_count, todo_file);
             E_FREAD_4(gotten_file_len, todo_file); // since we re-read next iteration, we don't care about the value of gotten_file_len
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
             continue;
@@ -445,25 +589,55 @@ void list(const char *file, uint8_t priority)
         if (memcmp(gotten_file, file, file_len)) // if NOT equal
         {
             free(gotten_file);
-            E_FREAD_1(gotten_priority, todo_file);
             E_FREAD_4(tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(parent, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FREAD_4(child_done_count, todo_file);
             E_FREAD_4(msg_len, todo_file);
             E_FSEEK(todo_file, msg_len, SEEK_CUR);
             continue;
         }
+
+        E_FREAD_4(tid, todo_file);
 
         // they are equal
         E_FREAD_1(gotten_priority, todo_file);
         if (gotten_priority < priority && !(priority <= PRIORITY_DEFAULT && gotten_priority == PRIORITY_DONE))
         {
             free(gotten_file);
-            E_FREAD_4(tid, todo_file);
+            E_FREAD_4(parent, todo_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FREAD_4(child_done_count, todo_file);
             E_FREAD_4(msg_len, todo_file);
             E_FSEEK(todo_file, msg_len, SEEK_CUR);
             continue; // skip it
         }
 
-        E_FREAD_4(tid, todo_file);
+        E_FREAD_4(parent, todo_file);
+
+        if (parent != sublist)
+        {
+            free(gotten_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FREAD_4(child_done_count, todo_file);
+            E_FREAD_4(msg_len, todo_file);
+            E_FSEEK(todo_file, msg_len, SEEK_CUR);
+            continue; // another skip
+        }
+
+        if (parent == 0 && sublist == 0 && tid == 0) // root task
+        {
+            free(gotten_file);
+            E_FREAD_4(child_count, todo_file);
+            E_FREAD_4(child_done_count, todo_file);
+            E_FREAD_4(msg_len, todo_file);
+            E_FSEEK(todo_file, msg_len, SEEK_CUR);
+            continue; // skip root task
+        }
+
+        E_FREAD_4(child_count, todo_file);
+        E_FREAD_4(child_done_count, todo_file);
         E_FREAD_4(msg_len, todo_file);
 
         E_MALLOC(msg, msg_len + 1);
@@ -474,7 +648,12 @@ void list(const char *file, uint8_t priority)
 
         printf("[%" PRIu32 "] ", tid);
 
-        printf(gotten_priority == 0 ? "[x] \033[32m" : "[ ] \033[33m"); // yellow/green(with [x]/[ ])
+        printf(gotten_priority == PRIORITY_DONE ? "[x] " : "[ ] "); // yellow/green(with [x]/[ ])
+
+        if (child_count > 0)
+            printf("<sublist> ");
+
+        printf(gotten_priority == PRIORITY_DONE ? "\033[32m" : "\033[33m");
 
         printf("%s", msg);
 
@@ -489,8 +668,9 @@ void list(const char *file, uint8_t priority)
 
 uint32_t parse_tid(const char *arg); // done and rm use it
 
-void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8_t *invalid_priorities, char **errormessages, uint8_t invalid_count)
+void done(const char *file, const char *arg, uint32_t sublist)
 {
+    uint32_t tid = parse_tid(arg);
     uint32_t file_len = strlen(file);
 
     FILE *todo_file;
@@ -502,6 +682,11 @@ void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8
     uint8_t gotten_priority;
     uint32_t gotten_tid;
     uint32_t gotten_msg_len;
+    uint32_t gotten_parent;
+    uint32_t gotten_child_count;
+    uint32_t gotten_child_done_count;
+
+    long parent_start = 0;
 
     bool made_done = false;
 
@@ -513,8 +698,11 @@ void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8
         if (gotten_file_len != file_len)
         {
             E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
-            E_FREAD_1(gotten_priority, todo_file);
             E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
             E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
@@ -527,40 +715,79 @@ void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8
         if (memcmp(gotten_file, file, file_len)) // if NOT equal
         {
             free(gotten_file);
-            E_FREAD_1(gotten_priority, todo_file);
             E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
             E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
         }
 
-        // equal files, check tid
-        E_FREAD_1(gotten_priority, todo_file); // just skip over it
         E_FREAD_4(gotten_tid, todo_file);
+
+        if (gotten_tid == sublist)
+        {
+            parent_start = ftell(todo_file);
+            if (parent_start == -1L)
+                FATAL("ftell");
+
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
+            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
+            continue;
+        }
 
         if (gotten_tid != tid)
         {
-            free(gotten_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
             E_FREAD_4(gotten_msg_len, todo_file);
             E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
             continue;
         }
 
-        for (uint8_t i = 0; i < invalid_count; i++)
+        E_FREAD_1(gotten_priority, todo_file);
+
+        if (gotten_priority == PRIORITY_DONE)
         {
-            if (gotten_priority == invalid_priorities[i])
-            {
-                fprintf(stderr, "%s\n", errormessages[i]);
-                exit(EXIT_FAILURE);
-            }
+            fprintf(stderr, "Task has already been marked done\n");
+            exit(EXIT_FAILURE);
         }
 
-        gotten_priority = new_priority; // set it to new priority(we later use this)
+        if (gotten_priority == PRIORITY_REMOVED)
+        {
+            fprintf(stderr, "Task has already been removed\n");
+            exit(EXIT_FAILURE);
+        }
 
-        // tid equal
-        E_FSEEK(todo_file, -sizeof(gotten_tid) - sizeof(gotten_priority), SEEK_CUR); // go backwards(safe as we JUST went forwards the same amount before)
+        E_FREAD_4(gotten_parent, todo_file);
+
+        if (gotten_parent != sublist)
+        {
+            fprintf(stderr, "Incorrect sublist specified to mark this task done.\n");
+            fprintf(stderr, "The correct sublist is: %" PRIu32 "\n", gotten_parent);
+            exit(EXIT_FAILURE);
+        }
+
+        E_FREAD_4(gotten_child_count, todo_file);
+        E_FREAD_4(gotten_child_done_count, todo_file);
+
+        if (gotten_child_count != gotten_child_done_count)
+        {
+            fprintf(stderr, "Cannot mark this sublist done as it still has children\n");
+            exit(EXIT_FAILURE);
+        }
+
+        E_FSEEK(todo_file, -sizeof(gotten_child_done_count) - sizeof(gotten_child_count) - sizeof(gotten_parent) - sizeof(gotten_priority), SEEK_CUR); // just go back to priority
+        gotten_priority = PRIORITY_DONE;                                                                                                               // set it to done
         E_FWRITE_1(gotten_priority, todo_file);
-        free(gotten_file);
         made_done = true;
         break;
     }
@@ -568,25 +795,182 @@ void change_priority(const char *file, uint32_t tid, uint8_t new_priority, uint8
     if (!made_done)
     {
         if (*file)
-            fprintf(stderr, "No such task id %u in file `%s`\n", tid, file);
+            fprintf(stderr, "No such task id %" PRIu32 " in file `%s`\n", tid, file);
         else
-            fprintf(stderr, "No such task id %u\n", tid);
+            fprintf(stderr, "No such task id %" PRIu32 "\n", tid);
         exit(EXIT_FAILURE);
     }
+
+    // successful case, so we update the parent
+    E_FSEEK(todo_file, parent_start, SEEK_SET);
+
+    E_FREAD_1(gotten_priority, todo_file);
+    if (gotten_priority == PRIORITY_DONE)
+    {
+        fprintf(stderr, "Parent has already been marked done\n");
+    }
+
+    if (gotten_priority == PRIORITY_REMOVED)
+    {
+        fprintf(stderr, "Parent has already been removed\n");
+    }
+
+    E_FREAD_4(gotten_parent, todo_file); // we don't care about the parent of the parent
+
+    E_FREAD_4(gotten_child_count, todo_file); // we don't care about the child_count of the parent
+    
+    E_FREAD_4(gotten_child_done_count, todo_file);
+    E_FSEEK(todo_file, -sizeof(gotten_child_done_count), SEEK_CUR);
+    gotten_child_done_count++;
+    E_FWRITE_4(gotten_child_done_count, todo_file);
 
     fclose(todo_file);
 }
 
-void done(const char *file, const char *arg)
+void rm(const char *file, const char *arg, uint32_t sublist)
 {
     uint32_t tid = parse_tid(arg);
-    change_priority(file, tid, PRIORITY_DONE, (uint8_t[]){PRIORITY_DONE, PRIORITY_REMOVED}, (char *[]){"Task is already marked done", "Task has already been removed"}, 2);
-}
+    uint32_t file_len = strlen(file);
 
-void rm(const char *file, const char *arg)
-{
-    uint32_t tid = parse_tid(arg);
-    change_priority(file, tid, PRIORITY_REMOVED, (uint8_t[]){PRIORITY_REMOVED}, (char *[]){"Task has already been removed"}, 1);
+    FILE *todo_file;
+
+    E_FOPEN_TASKS(todo_file, TODO_FILE, "r+b");
+
+    uint32_t gotten_file_len;
+    char *gotten_file;
+    uint8_t gotten_priority;
+    uint32_t gotten_tid;
+    uint32_t gotten_msg_len;
+    uint32_t gotten_parent;
+    uint32_t gotten_child_count;
+    uint32_t gotten_child_done_count;
+
+    long parent_start = 0;
+
+    bool removed = false;
+
+    while (true)
+    {
+        if (le_fread_4(&gotten_file_len, todo_file) != sizeof(gotten_file_len))
+            break; // nothing left
+
+        if (gotten_file_len != file_len)
+        {
+            E_FSEEK(todo_file, gotten_file_len, SEEK_CUR);
+            E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
+            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
+            continue;
+        }
+
+        E_MALLOC(gotten_file, gotten_file_len);
+
+        fread(gotten_file, gotten_file_len, 1, todo_file);
+
+        if (memcmp(gotten_file, file, file_len)) // if NOT equal
+        {
+            free(gotten_file);
+            E_FREAD_4(gotten_tid, todo_file);
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
+            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
+            continue;
+        }
+
+        E_FREAD_4(gotten_tid, todo_file);
+
+        if (gotten_tid == sublist)
+        {
+            parent_start = ftell(todo_file);
+            if (parent_start == -1L)
+                FATAL("ftell");
+
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
+            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
+            continue;
+        }
+
+        if (gotten_tid != tid)
+        {
+            E_FREAD_1(gotten_priority, todo_file);
+            E_FREAD_4(gotten_parent, todo_file);
+            E_FREAD_4(gotten_child_count, todo_file);
+            E_FREAD_4(gotten_child_done_count, todo_file);
+            E_FREAD_4(gotten_msg_len, todo_file);
+            E_FSEEK(todo_file, gotten_msg_len, SEEK_CUR);
+            continue;
+        }
+
+        E_FREAD_1(gotten_priority, todo_file);
+
+        if (gotten_priority == PRIORITY_REMOVED)
+        {
+            fprintf(stderr, "Task has already been removed\n");
+            exit(EXIT_FAILURE);
+        }
+
+        E_FREAD_4(gotten_parent, todo_file);
+
+        if (gotten_parent != sublist)
+        {
+            fprintf(stderr, "Incorrect sublist specified to mark this task done.\n");
+            fprintf(stderr, "The correct sublist is: %" PRIu32 "\n", gotten_parent);
+            exit(EXIT_FAILURE);
+        }
+
+        E_FREAD_4(gotten_child_count, todo_file);
+        E_FREAD_4(gotten_child_done_count, todo_file);
+
+        if (gotten_child_count > 0)
+        {
+            fprintf(stderr, "Cannot mark this sublist done as it still has children\n");
+            exit(EXIT_FAILURE);
+        }
+
+        E_FSEEK(todo_file, -sizeof(gotten_child_done_count) - sizeof(gotten_child_count) - sizeof(gotten_parent) - sizeof(gotten_priority), SEEK_CUR); // just go back to priority
+        gotten_priority = PRIORITY_DONE;                                                                                                               // set it to done
+        E_FWRITE_1(gotten_priority, todo_file);
+        removed = true;
+        break;
+    }
+
+    if (!removed)
+    {
+        if (*file)
+            fprintf(stderr, "No such task id %" PRIu32 " in file `%s`\n", tid, file);
+        else
+            fprintf(stderr, "No such task id %" PRIu32 "\n", tid);
+        exit(EXIT_FAILURE);
+    }
+
+    // successful case, so we update the parent
+    E_FSEEK(todo_file, parent_start, SEEK_SET);
+
+    E_FREAD_1(gotten_priority, todo_file);
+    if (gotten_priority == PRIORITY_REMOVED)
+    {
+        fprintf(stderr, "Parent has already been removed\n");
+    }
+
+    E_FREAD_4(gotten_parent, todo_file); // we don't care about the parent of the parent
+
+    E_FREAD_4(gotten_child_count, todo_file);
+    E_FSEEK(todo_file, -sizeof(gotten_child_count), SEEK_CUR); // go back to child_count as it represents non-removed, meaning decrementation!!
+    gotten_child_count--;
+    E_FWRITE_4(gotten_child_count, todo_file);
+
+    fclose(todo_file);
 }
 
 uint32_t parse_tid(const char *arg) // needed by `done` and `rm`
@@ -650,7 +1034,7 @@ static uint8_t parse_priority(const char *str)
     }
     if (value == PRIORITY_REMOVED || value == PRIORITY_DONE)
     {
-        fprintf(stderr, "Priority cannot be %u\n", value);
+        fprintf(stderr, "Priority cannot be %" PRIu8 "\n", value);
         exit(EXIT_FAILURE);
     }
     return value;
@@ -784,6 +1168,7 @@ static void parse_args(int argc, char **argv, cli_state *state)
                 break;
             case 's':
                 HANDLE_ARG_SUBL("-s", state, i, argc, argv);
+                break;
             default:
                 UNRECOGNIZED_OPTION(arg);
             }
@@ -844,10 +1229,10 @@ int main(int argc, char **argv)
             fprintf(stderr, "`add` expects a message\n");
             return 1;
         }
-        add(state.file, state.arg, state.priority);
+        add(state.file, state.arg, state.priority, state.sublist);
         break;
     case SUBCOMMAND_LIST:
-        list(state.file, state.priority);
+        list(state.file, state.priority, state.sublist);
         break;
     case SUBCOMMAND_DONE:
         if (!state.arg)
@@ -855,7 +1240,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "`done` expects a task id\n");
             return 1;
         }
-        done(state.file, state.arg);
+        done(state.file, state.arg, state.sublist);
         break;
     case SUBCOMMAND_RM:
         if (!state.arg)
@@ -863,7 +1248,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "`rm` expects a task id\n");
             return 1;
         }
-        rm(state.file, state.arg);
+        rm(state.file, state.arg, state.sublist);
         break;
     }
 

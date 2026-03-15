@@ -5,16 +5,16 @@
 .todo:
     endianness: little endian
 
-    [file_len][file][priority][parent][child-count][child-done-count][tid][message_len][message]...
+    [file_len][file][tid][priority][parent][child-count][child-done-count][message_len][message]...
 
     types:
         file_len: u32
         file: char[file_len]
+        tid: u32
         priority: u8
         parent: u32
         child-count: u32
         child-done-count: u32
-        tid: u32
         message_len: u32
         message: char[message_len]
 
