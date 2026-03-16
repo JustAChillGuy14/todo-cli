@@ -939,7 +939,7 @@ void rm(const char *file, const char *arg, uint32_t sublist)
         }
 
         E_FSEEK(todo_file, -sizeof(gotten_child_done_count) - sizeof(gotten_child_count) - sizeof(gotten_parent) - sizeof(gotten_priority), SEEK_CUR); // just go back to priority
-        gotten_priority = PRIORITY_DONE;                                                                                                               // set it to done
+        gotten_priority = PRIORITY_REMOVED;                                                                                                               // set it to done
         E_FWRITE_1(gotten_priority, todo_file);
         removed = true;
         break;
