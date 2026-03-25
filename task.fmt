@@ -18,6 +18,23 @@
         message_len: u32
         message: char[message_len]
 
+    description/notes:
+        this file is a database of all of the tasks
+
+        priority is overloaded:
+            priority = 0 => the task is done
+            and priority = 1 => the task is removed,
+            any other priority is a valid active task
+        
+        root task:
+            every top-level task actually has parent = 0,
+            the parent 0 is not an implicit root task, but an actual task.
+            task ID 0 is present inside of .todo as it helps for info about tasks of the file.
+            we can simply see done/removed tasks with the help of the root task.
+        
+        child count:
+            child-count is actually the count of the children that aren't removed.
+
 .todo.tid:
     endianness: little endian
 
@@ -27,3 +44,7 @@
         file_len: u32
         file: char[file_len]
         current_tid: u32
+
+    description/notes:
+        this file is used to track the current(last used) task ID.
+        to get a new task ID, we can simply add one to this.
