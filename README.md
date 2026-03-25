@@ -34,6 +34,9 @@ clang -o todo todo.c
 ## Example
 
 ```sh
-./todo add "Buy groceries"
+./todo add "Complete homework"
 ./todo list
+./todo add "Complete English homework" --sublist 1 # Add task to a specific sublist(parent) with `-s`/`--sublist`
+./todo add "Complete Science homework" -s 1
+./todo list -s 1 # View all children on 1
 ```
