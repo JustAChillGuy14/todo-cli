@@ -104,116 +104,116 @@ size_t le_fread_8(uint64_t *val, FILE *stream)
 /*
 Stands for error malloc(allocate memory and fatally error if can't alloc)
 */
-#define E_MALLOC(varname, s) \
-    do                       \
-    {                        \
-        varname = malloc(s); \
-        if (s && !varname)   \
-        {                    \
-            FATAL("malloc"); \
-        }                    \
+#define E_MALLOC(varname, s)                    \
+    do                                          \
+    {                                           \
+        (varname) = malloc((s));                \
+        if ((s) && !(varname))                  \
+        {                                       \
+            FATAL("malloc");                    \
+        }                                       \
     } while (0)
 
-#define E_FOPEN(file_var, filename, mode) \
-    do                                    \
-    {                                     \
-        file_var = fopen(filename, mode); \
-        if (!file_var)                    \
-            FATAL("fopen");               \
+#define E_FOPEN(file_var, filename, mode)       \
+    do                                          \
+    {                                           \
+        (file_var) = fopen((filename), (mode)); \
+        if (!(file_var))                        \
+            FATAL("fopen");                     \
     } while (0)
 
-#define E_FSEEK(file, off, whence)        \
-    do                                    \
-    {                                     \
-        if (fseek(file, off, whence) < 0) \
-            FATAL("fseek");               \
+#define E_FSEEK(file, off, whence)              \
+    do                                          \
+    {                                           \
+        if (fseek((file), (off), (whence)) < 0) \
+            FATAL("fseek");                     \
     } while (0)
 
-#define E_FOPEN_TASKS(file_var, filename, mode)         \
-    do                                                  \
-    {                                                   \
-        file_var = fopen(filename, mode);               \
-        if (!file_var)                                  \
-        {                                               \
-            if (errno == ENOENT)                        \
-            {                                           \
-                fprintf(stderr, "No tasks present.\n"); \
-                exit(EXIT_FAILURE);                     \
-            }                                           \
-            FATAL("fopen");                             \
-        }                                               \
+#define E_FOPEN_TASKS(file_var, filename, mode)          \
+    do                                                   \
+    {                                                    \
+        (file_var) = fopen((filename), (mode));          \
+        if (!(file_var))                                 \
+        {                                                \
+            if (errno == ENOENT)                         \
+            {                                            \
+                fprintf(stderr, "No tasks present. \n"); \
+                exit(EXIT_FAILURE);                      \
+            }                                            \
+            FATAL("fopen");                              \
+        }                                                \
     } while (0)
 
-#define E_FWRITE_1(val, file)                      \
-    do                                             \
-    {                                              \
-        if (le_fwrite_1(val, file) != sizeof(val)) \
-        {                                          \
-            FATAL("fwrite");                       \
-        }                                          \
+#define E_FWRITE_1(val, file)                            \
+    do                                                   \
+    {                                                    \
+        if (le_fwrite_1((val), (file)) != sizeof((val))) \
+        {                                                \
+            FATAL("fwrite");                             \
+        }                                                \
     } while (0)
 
-#define E_FWRITE_2(val, file)                      \
-    do                                             \
-    {                                              \
-        if (le_fwrite_2(val, file) != sizeof(val)) \
-        {                                          \
-            FATAL("fwrite");                       \
-        }                                          \
+#define E_FWRITE_2(val, file)                            \
+    do                                                   \
+    {                                                    \
+        if (le_fwrite_2((val), (file)) != sizeof((val))) \
+        {                                                \
+            FATAL("fwrite");                             \
+        }                                                \
     } while (0)
 
-#define E_FWRITE_4(val, file)                      \
-    do                                             \
-    {                                              \
-        if (le_fwrite_4(val, file) != sizeof(val)) \
-        {                                          \
-            FATAL("fwrite");                       \
-        }                                          \
+#define E_FWRITE_4(val, file)                            \
+    do                                                   \
+    {                                                    \
+        if (le_fwrite_4((val), (file)) != sizeof((val))) \
+        {                                                \
+            FATAL("fwrite");                             \
+        }                                                \
     } while (0)
 
-#define E_FWRITE_8(val, file)                      \
-    do                                             \
-    {                                              \
-        if (le_fwrite_8(val, file) != sizeof(val)) \
-        {                                          \
-            FATAL("fwrite");                       \
-        }                                          \
+#define E_FWRITE_8(val, file)                            \
+    do                                                   \
+    {                                                    \
+        if (le_fwrite_8((val), (file)) != sizeof((val))) \
+        {                                                \
+            FATAL("fwrite");                             \
+        }                                                \
     } while (0)
 
-#define E_FREAD_1(var, file)                       \
-    do                                             \
-    {                                              \
-        if (le_fread_1(&var, file) != sizeof(var)) \
-        {                                          \
-            FATAL("fread");                        \
-        }                                          \
+#define E_FREAD_1(var, file)                             \
+    do                                                   \
+    {                                                    \
+        if (le_fread_1(&(var), (file)) != sizeof((var))) \
+        {                                                \
+            FATAL("fread");                              \
+        }                                                \
     } while (0)
 
-#define E_FREAD_2(var, file)                       \
-    do                                             \
-    {                                              \
-        if (le_fread_2(&var, file) != sizeof(var)) \
-        {                                          \
-            FATAL("fread");                        \
-        }                                          \
+#define E_FREAD_2(var, file)                             \
+    do                                                   \
+    {                                                    \
+        if (le_fread_2(&(var), (file)) != sizeof((var))) \
+        {                                                \
+            FATAL("fread");                              \
+        }                                                \
     } while (0)
 
-#define E_FREAD_4(var, file)                       \
-    do                                             \
-    {                                              \
-        if (le_fread_4(&var, file) != sizeof(var)) \
-        {                                          \
-            FATAL("fread");                        \
-        }                                          \
+#define E_FREAD_4(var, file)                             \
+    do                                                   \
+    {                                                    \
+        if (le_fread_4(&(var), (file)) != sizeof((var))) \
+        {                                                \
+            FATAL("fread");                              \
+        }                                                \
     } while (0)
 
-#define E_FREAD_8(var, file)                       \
-    do                                             \
-    {                                              \
-        if (le_fread_8(&var, file) != sizeof(var)) \
-        {                                          \
-            FATAL("fread");                        \
-        }                                          \
+#define E_FREAD_8(var, file)                             \
+    do                                                   \
+    {                                                    \
+        if (le_fread_8(&(var), (file)) != sizeof((var))) \
+        {                                                \
+            FATAL("fread");                              \
+        }                                                \
     } while (0)
 
 #define TODO_FILE ".todo"
@@ -1070,49 +1070,50 @@ typedef struct
     uint32_t sublist; // essentially the parent
 } cli_state;
 
-#define REQUIRE_ARG(subcmd, i, argc)                           \
-    do                                                         \
-    {                                                          \
-        if (i + 1 >= argc)                                     \
-        {                                                      \
-            fprintf(stderr, "%s requires argument\n", subcmd); \
-            exit(EXIT_FAILURE);                                \
-        }                                                      \
+#define REQUIRE_ARG(subcmd, i, argc)                             \
+    do                                                           \
+    {                                                            \
+        if ((i) + 1 >= (argc))                                   \
+        {                                                        \
+            fprintf(stderr, "%s requires argument\n", (subcmd)); \
+            exit(EXIT_FAILURE);                                  \
+        }                                                        \
     } while (0)
 
-#define HANDLE_ARG_HELP(state, argv)                  \
-    do                                                \
-    {                                                 \
-        usage_subcommand(state->subcommand, argv[0]); \
-        exit(EXIT_SUCCESS);                           \
+#define HANDLE_ARG_HELP(state, argv)                             \
+    do                                                           \
+    {                                                            \
+        usage_subcommand((state)->subcommand, argv[0]);          \
+        exit(EXIT_SUCCESS);                                      \
     } while (0)
 
-#define HANDLE_ARG_FILE(f, state, i, argc, argv) \
-    do                                           \
-    {                                            \
-        REQUIRE_ARG(f, i, argc);                 \
-        state->file = argv[++i];                 \
+#define HANDLE_ARG_FILE(f, state, i, argc, argv)                 \
+    do                                                           \
+    {                                                            \
+        REQUIRE_ARG((f), (i), (argc));                           \
+        (state)->file = (argv)[++(i)];                           \
     } while (0)
 
-#define HANDLE_ARG_PRIO(p, state, i, argc, argv)     \
-    do                                               \
-    {                                                \
-        REQUIRE_ARG(p, i, argc);                     \
-        state->priority = parse_priority(argv[++i]); \
+#define HANDLE_ARG_PRIO(p, state, i, argc, argv)                 \
+    do                                                           \
+    {                                                            \
+        REQUIRE_ARG((p), (i), (argc));                           \
+        (state)->priority = parse_priority((argv)[++(i)]);       \
     } while (0)
 
-#define HANDLE_ARG_SUBL(s, state, i, argc, argv)   \
-    do                                             \
-    {                                              \
-        REQUIRE_ARG(s, i, argc);                   \
-        state->sublist = parse_sublist(argv[++i]); \
+
+#define HANDLE_ARG_SUBL(s, state, i, argc, argv)                 \
+    do                                                           \
+    {                                                            \
+        REQUIRE_ARG((s), (i), (argc));                           \
+        (state)->sublist = parse_sublist((argv)[++(i)]);         \
     } while (0)
 
-#define UNRECOGNIZED_OPTION(arg)                            \
-    do                                                      \
-    {                                                       \
-        fprintf(stderr, "Unrecognized option `%s`\n", arg); \
-        exit(EXIT_FAILURE);                                 \
+#define UNRECOGNIZED_OPTION(arg)                                 \
+    do                                                           \
+    {                                                            \
+        fprintf(stderr, "Unrecognized option `%s`\n", (arg));    \
+        exit(EXIT_FAILURE);                                      \
     } while (0)
 
 static void parse_args(int argc, char **argv, cli_state *state)
